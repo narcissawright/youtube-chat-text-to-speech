@@ -1,0 +1,11 @@
+{
+	"name": "YouTube Chat Text to Speech",
+	"description": "Use WebSpeech API to vocalize the YouTube chat!",
+	"manifest_version": 3,
+	"version": "0.1",
+	"content_scripts": [{
+		"matches": ["https://studio.youtube.com/*/livestreaming"],
+		"js": ["my_script.js"],
+		"run_at": "document_idle"
+	}]
+}

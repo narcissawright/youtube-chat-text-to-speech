@@ -1,106 +1,102 @@
-// my_script.js
-var synth = window.speechSynthesis;
-var voices = [];
+'use strict';
 
+const blocklist = [];
+
+const profiles = {
+    ['Narcissa Wright']: {
+	voices: ['Microsoft Zira - English (United States)', // prioritize zira
+		 'Google UK English Female'],
+	volume: 0.7
+    }
+};
+
+const synth = window.speechSynthesis;
+let all_voices = [];
+
+String.prototype.hashCode = function() {
+  var hash = 0, i, chr;
+  if (this.length === 0) return hash;
+  for (i = 0; i < this.length; i++) {
+    chr   = this.charCodeAt(i);
+    hash  = ((hash << 5) - hash) + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  var result = (hash * -1 / Math.pow(2, 32)) + 0.5
+  return result
+};
+
+// Boilerplate for loading voices.
 function populateVoiceList() {
-  voices = synth.getVoices().sort(function (a, b) {
-      const aname = a.name.toUpperCase(), bname = b.name.toUpperCase();
-      if ( aname < bname ) return -1;
-      else if ( aname == bname ) return 0;
-      else return +1;
-  });
+    if(typeof synth === 'undefined') {
+	return;
+    }
+    all_voices = synth.getVoices();
+    console.log('available voices:');
+    for (const voice of all_voices) {
+    	console.log(voice.name);
+    }
 }
 populateVoiceList();
-if (speechSynthesis.onvoiceschanged !== undefined) {
-  speechSynthesis.onvoiceschanged = populateVoiceList;
+if (typeof synth !== 'undefined' && synth.onvoiceschanged !== undefined) {
+  synth.onvoiceschanged = populateVoiceList;
 }
 
-console.log("YouTube Chat WebSpeech API extension is running...")
+console.log('YouTube Chat Web Speech API extension is running...');
 
-var msg_array = []
-
-setTimeout(function() {
-	setInterval(function() {
-		update_msg_array()
-		if ((msg_array.length > 0) && (synth.speaking == false)) {
-			processQueue()
-		}
-	}, 1000);
-}, 7000);
-
-var last_msg_id = ""
-
-function update_msg_array() {
-	var list = document.getElementById('item-offset').querySelector("#items").childNodes
-	var up_to_date = false 
-	if (last_msg_id == "") { up_to_date = true }
-
-	for (let i = 0; i < list.length; i++) {	
-		if (list[i].nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
-			if ((up_to_date) && (list[i].id.length > 40)) {
-			
-				var content = list[i].querySelector("#content")
-				var author = content.childNodes[1].querySelector("#author-name").innerText
-				var text = content.querySelector("#message").innerText
-		
-				var message = {
-					id: list[i].id,
-					content : content,
-					author : author,
-					text : text
-				}
-				
-				msg_array.push(message)
-				last_msg_id = message.id
-			} else if (list[i].id == last_msg_id) { 
-				up_to_date = true
-			}
-		}
-	}
-}
-
-function processQueue() {
-	if (msg_array.length > 0) {
-		speak(msg_array.shift())
-	}
-}
-
-function speak(message){
-    if (synth.speaking) {
-        console.error('speechSynthesis.speaking');
-        return;
+// Wait a couple seconds to let the page load before setting everything up.
+setTimeout(() => {    
+    // Select the node that will be observed for mutations.
+    const chatNode = document.getElementById('item-offset');
+    if (!chatNode) {
+	console.error('chatNode null or something: ' + chatNode);
     }
-  	var utterThis = new SpeechSynthesisUtterance(message.text);
-	// utterThis.onend   = function (event) { console.log('SpeechSynthesisUtterance.onend');     }
-	// utterThis.onerror = function (event) { console.error('SpeechSynthesisUtterance.onerror'); }
-	utterThis.addEventListener('end', function(event) { 
-		processQueue();
-	});
-	
-	
-	if (message.author == "Narcissa Wright") {
-		for(i = 0; i < voices.length ; i++) {
-			if(voices[i].name === 'Microsoft Zira - English (United States)') {
-				utterThis.voice = voices[i]; // is the girl
-				utterThis.volume = 0.75
-				utterThis.pitch = 1.0;
-				utterThis.rate = 1.0;
-				break;
-			}
-		}
-	} else {
-		var v = Math.floor(Math.random() * 2)
-		utterThis.voice = voices[v];
-		utterThis.volume = 0.45
-		utterThis.pitch = 1.0 + (Math.random() - 0.5);
-		utterThis.rate = 1.0 + ((Math.random() - 0.5) * 0.5);
+    
+    // Options for the observer (which mutations to observe).
+    const config = { attributes: true, childList: true, subtree: true };
+    
+    // Initialize message counter (k) to point to the end of the chat.
+    let k = chatNode.querySelector("#items").childNodes.length;
+
+    // Start observing the chat.
+    new MutationObserver(() => {
+	const list = chatNode.querySelector("#items").childNodes;
+	for (; k < list.length; k++) {
+	    if (list[k].nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
+		const content = list[k].querySelector("#content");
+		const author = content.childNodes[1].querySelector("#author-name").innerText;
+		const text = content.querySelector("#message").innerText;
+		speak(author, text);
+	    }
 	}
+    }).observe(chatNode, config);
+
+    // Speak a message (called from observer code).
+    function speak(author, text){
+	if (blocklist.includes(author)) {
+	    return;
+	}
+	
+	let utterThis = new SpeechSynthesisUtterance(text);
+
+	const profile = profiles[author];
+	if (profile) {
+	    // Use highest priority preferred voice that is available.
+	    utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
+	    utterThis.volume = profile.volume;
+	}
+	else {
+	    // Use author name as a voice seed.
+		var seeded_random = (author + 'voice').hashCode()
+		var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
+		utterThis.voice = all_voices[seeded_voice];
+		utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
+		utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
+		utterThis.volume = 0.45
+	}
+	
 	synth.speak(utterThis);
-}
-
-
-
-
+    }
+}, 4000);
 
 
 

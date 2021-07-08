@@ -4,10 +4,21 @@ const blocklist = [];
 
 const profiles = {
     ['Narcissa Wright']: {
-	voices: ['Microsoft Zira - English (United States)', // prioritize zira
-		 'Google UK English Female'],
-	volume: 0.7
-    }
+	voices: ['Microsoft Zira - English (United States)'],
+	volume: 0.7,
+	pitch: 1.0,
+	rate: 1.0
+    }, ['D_Girl']: {
+	voices: ['Microsoft Zira - English (United States)'],
+	volume: 0.6,
+	pitch: 0.45,
+	rate: 1.0
+	}, ['Tracee Wu']: {
+	voices: ['Microsoft Zira - English (United States)'],
+	volume: 0.6,
+	pitch: 1.4,
+	rate: 1.0
+	}
 };
 
 const synth = window.speechSynthesis;
@@ -76,6 +87,21 @@ setTimeout(() => {
 	    return;
 	}
 	
+	// put some text logic here!
+	text = text.replace("nair", "neutral air")
+	text = text.replace("bair", "back air")
+	text = text.replace("uair", "up air")
+	text = text.replace("dair", "down air")
+	text = text.replace("dtilt", "down tilt")
+	text = text.replace("OoS", "out of shield")
+	text = text.replace("ftilt", "forward tilt")
+	text = text.replace("utilt", "up tilt")
+	
+	text = text.replace("w/e", "whatever")
+	text = text.replace("lol", "lawl")
+	text = text.replace("yume", "you may")
+	
+	
 	let utterThis = new SpeechSynthesisUtterance(text);
 
 	const profile = profiles[author];
@@ -83,6 +109,8 @@ setTimeout(() => {
 	    // Use highest priority preferred voice that is available.
 	    utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
 	    utterThis.volume = profile.volume;
+		utterThis.pitch = profile.pitch;
+		utterThis.rate = profile.rate;
 	}
 	else {
 	    // Use author name as a voice seed.
@@ -91,7 +119,7 @@ setTimeout(() => {
 		utterThis.voice = all_voices[seeded_voice];
 		utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
 		utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
-		utterThis.volume = 0.45
+		utterThis.volume = 0.525
 	}
 	
 	synth.speak(utterThis);

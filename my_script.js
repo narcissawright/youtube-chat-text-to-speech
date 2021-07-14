@@ -2,6 +2,9 @@
 
 const blocklist = [];
 
+var prior_author = ''
+var prior_phrase = ''
+
 const profiles = {
     ['Narcissa Wright']: {
 	voices: ['Microsoft Zira - English (United States)'],
@@ -12,12 +15,17 @@ const profiles = {
 	voices: ['Microsoft Zira - English (United States)'],
 	volume: 0.6,
 	pitch: 0.45,
-	rate: 1.0
+	rate: 1.02
 	}, ['Tracee Wu']: {
 	voices: ['Microsoft Zira - English (United States)'],
 	volume: 0.6,
 	pitch: 1.4,
 	rate: 1.0
+	}, ['Yume Tea']: {
+	voices: ['Microsoft Zira - English (United States)'],
+	volume: 0.6,
+	pitch: 1.12,
+	rate: 0.98
 	}
 };
 
@@ -83,46 +91,54 @@ setTimeout(() => {
 
     // Speak a message (called from observer code).
     function speak(author, text){
-	if (blocklist.includes(author)) {
-	    return;
-	}
+		if (blocklist.includes(author)) { return; }
 	
-	// put some text logic here!
-	text = text.replace("nair", "neutral air")
-	text = text.replace("bair", "back air")
-	text = text.replace("uair", "up air")
-	text = text.replace("dair", "down air")
-	text = text.replace("dtilt", "down tilt")
-	text = text.replace("OoS", "out of shield")
-	text = text.replace("ftilt", "forward tilt")
-	text = text.replace("utilt", "up tilt")
-	
-	text = text.replace("w/e", "whatever")
-	text = text.replace("lol", "lawl")
-	text = text.replace("yume", "you may")
-	
-	
-	let utterThis = new SpeechSynthesisUtterance(text);
+		// put some text logic here!
+		text = text.replace("nair", "neutral air")
+		text = text.replace("bair", "back air")
+		text = text.replace("uair", "up air")
+		text = text.replace("dair", "down air")
+		text = text.replace("dtilt", "down tilt")
+		text = text.replace("OoS", "out of shield")
+		text = text.replace("ftilt", "forward tilt")
+		text = text.replace("utilt", "up tilt")
+		text = text.replace("w/e", "whatever")
+		text = text.replace("lol", "lawl")
+		text = text.replace("yume", "you may")
+		text = text.replace("Yume", "you may")
+		if (text == "gl") {
+			text = "good luck"
+		} else if (text == "ty") {
+			text = "thank you"
+		}
+		
+		console.log(text)
+		
+		if ((prior_author == author) && (prior_phrase == text)) {
+			return
+		}
+		prior_author = author
+		prior_phrase = text
+		let utterThis = new SpeechSynthesisUtterance(text);
 
-	const profile = profiles[author];
-	if (profile) {
-	    // Use highest priority preferred voice that is available.
-	    utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
-	    utterThis.volume = profile.volume;
-		utterThis.pitch = profile.pitch;
-		utterThis.rate = profile.rate;
-	}
-	else {
-	    // Use author name as a voice seed.
-		var seeded_random = (author + 'voice').hashCode()
-		var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
-		utterThis.voice = all_voices[seeded_voice];
-		utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
-		utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
-		utterThis.volume = 0.525
-	}
-	
-	synth.speak(utterThis);
+		const profile = profiles[author];
+		if (profile) {
+			// Use highest priority preferred voice that is available.
+			utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
+			utterThis.volume = profile.volume;
+			utterThis.pitch = profile.pitch;
+			utterThis.rate = profile.rate;
+		}
+		else {
+			// Use author name as a voice seed.
+			var seeded_random = (author + 'voice').hashCode()
+			var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
+			utterThis.voice = all_voices[seeded_voice];
+			utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
+			utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
+			utterThis.volume = 0.525
+		}
+		synth.speak(utterThis);
     }
 }, 4000);
 

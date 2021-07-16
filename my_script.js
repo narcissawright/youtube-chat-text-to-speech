@@ -1,10 +1,6 @@
 'use strict';
 
 const blocklist = [];
-
-var prior_author = ''
-var prior_phrase = ''
-
 const profiles = {
     ['Narcissa Wright']: {
 	voices: ['Microsoft Zira - English (United States)'],
@@ -50,7 +46,6 @@ function populateVoiceList() {
 	return;
     }
     all_voices = synth.getVoices();
-    console.log('available voices:');
     for (const voice of all_voices) {
     	console.log(voice.name);
     }
@@ -61,6 +56,88 @@ if (typeof synth !== 'undefined' && synth.onvoiceschanged !== undefined) {
 }
 
 console.log('YouTube Chat Web Speech API extension is running...');
+
+const blocked_phrases = ["cosmo", "ywnbaw", "you will never be a woman"]
+var prior_author = ''
+var prior_phrase = ''
+
+// Speak a message (called from observer code).
+function speak(author, text){
+	text = text.toLowerCase();
+	
+	let block = false
+	// prevent blocked authors
+	if (blocklist.includes(author)) { block = true }
+	// prevent duplicate adjacent messages
+	if ((prior_author == author) && (prior_phrase == text)) { block = true }
+	// prevent messages with blocked phrases
+	blocked_phrases.forEach(phrase => {
+		if (text.includes(phrase)) { block = true } 
+	});
+	
+	if (block) { return }
+	prior_author = author
+	prior_phrase = text
+	
+	// splitting it by words can be good but I think I wanna separate by more than just spaces...
+	/*
+	var words = text.match(/\S+/g);
+	for (var i = 0; i < words.length; i++) { 
+		
+	}
+	text = words.join(' ');
+	*/
+	
+	// text logic, cruddy right now.
+	text = text.replace("nair", "neutral air")
+	text = text.replace("bair", "back air")
+	text = text.replace("uair", "up air")
+	text = text.replace("dair", "down air")
+	text = text.replace("dtilt", "down tilt")
+	text = text.replace("OoS", "out of shield")
+	text = text.replace("ftilt", "forward tilt")
+	text = text.replace("utilt", "up tilt")
+	text = text.replace("w/e", "whatever")
+	text = text.replace("lol", "lawl")
+	text = text.replace("yume", "you may")
+	if (text == "gl") {
+		text = "good luck"
+	} else if (text == "ty") {
+		text = "thank you"
+	}
+	
+	
+	console.log(author + ": " + text)
+	let utterThis = new SpeechSynthesisUtterance(text);
+
+	const profile = profiles[author];
+	if (profile) {
+		// Use highest priority preferred voice that is available.
+		utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
+		utterThis.volume = profile.volume;
+		utterThis.pitch = profile.pitch;
+		utterThis.rate = profile.rate;
+	}
+	else {
+		// Use author name as a voice seed.
+		var seeded_random = (author + 'voice').hashCode()
+		var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
+		utterThis.voice = all_voices[seeded_voice];
+		utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
+		utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
+		utterThis.volume = 0.525
+	}
+	synth.speak(utterThis);
+}
+
+
+/*
+function nodeCheck(n) {
+	if (n.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
+		
+	}
+}
+*/
 
 // Wait a couple seconds to let the page load before setting everything up.
 setTimeout(() => {    
@@ -75,65 +152,17 @@ setTimeout(() => {
 	// Start observing the chat.
     new MutationObserver(() => {
 		const list = chatNode.querySelector("#items").childNodes;
-		let newNode = list.item(list.length - 1)
+		let current_index = list.length - 1 // I belive this method still can skip messages, would like to resolve.
+		let newNode = list.item(current_index)
 		if (newNode.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
-			const content = newNode.querySelector("#content");
-			const author = content.childNodes[1].querySelector("#author-name").innerText;
-			const text = content.querySelector("#message").innerText;
+			const author = newNode.querySelector("#content").childNodes[1].querySelector("#author-name").innerText;
+			const text = newNode.querySelector("#content").querySelector("#message").innerText;
 			speak(author, text);
 		}
 	}).observe(chatNode, config);
-
-    // Speak a message (called from observer code).
-    function speak(author, text){
-		if (blocklist.includes(author)) { return; }
-	
-		// put some text logic here!
-		text = text.replace("nair", "neutral air")
-		text = text.replace("bair", "back air")
-		text = text.replace("uair", "up air")
-		text = text.replace("dair", "down air")
-		text = text.replace("dtilt", "down tilt")
-		text = text.replace("OoS", "out of shield")
-		text = text.replace("ftilt", "forward tilt")
-		text = text.replace("utilt", "up tilt")
-		text = text.replace("w/e", "whatever")
-		text = text.replace("lol", "lawl")
-		text = text.replace("yume", "you may")
-		text = text.replace("Yume", "you may")
-		if (text == "gl") {
-			text = "good luck"
-		} else if (text == "ty") {
-			text = "thank you"
-		}
-		
-		if ((prior_author == author) && (prior_phrase == text)) {
-			return
-		}
-		prior_author = author
-		prior_phrase = text
-		let utterThis = new SpeechSynthesisUtterance(text);
-
-		const profile = profiles[author];
-		if (profile) {
-			// Use highest priority preferred voice that is available.
-			utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
-			utterThis.volume = profile.volume;
-			utterThis.pitch = profile.pitch;
-			utterThis.rate = profile.rate;
-		}
-		else {
-			// Use author name as a voice seed.
-			var seeded_random = (author + 'voice').hashCode()
-			var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
-			utterThis.voice = all_voices[seeded_voice];
-			utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
-			utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
-			utterThis.volume = 0.525
-		}
-		synth.speak(utterThis);
-    }
 }, 4000);
+
+
 
 
 

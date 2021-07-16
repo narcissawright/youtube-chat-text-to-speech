@@ -1,44 +1,13 @@
 'use strict';
 
-const blocklist = [];
+const blocklist = [
+];
+
 const profiles = {
-    ['Narcissa Wright']: {
-	voices: ['Microsoft Zira - English (United States)'],
-	volume: 0.7,
-	pitch: 1.0,
-	rate: 1.0
-    }, ['D_Girl']: {
-	voices: ['Microsoft Zira - English (United States)'],
-	volume: 0.6,
-	pitch: 0.45,
-	rate: 1.02
-	}, ['Tracee Wu']: {
-	voices: ['Microsoft Zira - English (United States)'],
-	volume: 0.6,
-	pitch: 1.4,
-	rate: 1.0
-	}, ['Yume Tea']: {
-	voices: ['Microsoft Zira - English (United States)'],
-	volume: 0.6,
-	pitch: 1.12,
-	rate: 0.98
-	}
 };
 
 const synth = window.speechSynthesis;
 let all_voices = [];
-
-String.prototype.hashCode = function() {
-  var hash = 0, i, chr;
-  if (this.length === 0) return hash;
-  for (i = 0; i < this.length; i++) {
-    chr   = this.charCodeAt(i);
-    hash  = ((hash << 5) - hash) + chr;
-    hash |= 0; // Convert to 32bit integer
-  }
-  var result = (hash * -1 / Math.pow(2, 32)) + 0.5
-  return result
-};
 
 // Boilerplate for loading voices.
 function populateVoiceList() {
@@ -46,132 +15,102 @@ function populateVoiceList() {
 	return;
     }
     all_voices = synth.getVoices();
+    console.log('available voices:');
     for (const voice of all_voices) {
     	console.log(voice.name);
     }
 }
 populateVoiceList();
 if (typeof synth !== 'undefined' && synth.onvoiceschanged !== undefined) {
-  synth.onvoiceschanged = populateVoiceList;
+    synth.onvoiceschanged = populateVoiceList;
 }
 
 console.log('YouTube Chat Web Speech API extension is running...');
 
-const blocked_phrases = ["cosmo", "ywnbaw", "you will never be a woman"]
-var prior_author = ''
-var prior_phrase = ''
-
-// Speak a message (called from observer code).
-function speak(author, text){
-	text = text.toLowerCase();
-	
-	let block = false
-	// prevent blocked authors
-	if (blocklist.includes(author)) { block = true }
-	// prevent duplicate adjacent messages
-	if ((prior_author == author) && (prior_phrase == text)) { block = true }
-	// prevent messages with blocked phrases
-	blocked_phrases.forEach(phrase => {
-		if (text.includes(phrase)) { block = true } 
-	});
-	
-	if (block) { return }
-	prior_author = author
-	prior_phrase = text
-	
-	// splitting it by words can be good but I think I wanna separate by more than just spaces...
-	/*
-	var words = text.match(/\S+/g);
-	for (var i = 0; i < words.length; i++) { 
-		
+// Create an array of [author, text] pairs (two-element arrays)
+// from a NodeList of messages.
+function mkLog(msgs) {
+    let log = [];
+    msgs.forEach(m => {
+	if (m.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
+	    const content = m.querySelector("#content");
+	    const author = content.childNodes[1].querySelector("#author-name").innerText
+	    const text = content.querySelector("#message").innerText;
+	    log.push([author, text]);
 	}
-	text = words.join(' ');
-	*/
-	
-	// text logic, cruddy right now.
-	text = text.replace("nair", "neutral air")
-	text = text.replace("bair", "back air")
-	text = text.replace("uair", "up air")
-	text = text.replace("dair", "down air")
-	text = text.replace("dtilt", "down tilt")
-	text = text.replace("OoS", "out of shield")
-	text = text.replace("ftilt", "forward tilt")
-	text = text.replace("utilt", "up tilt")
-	text = text.replace("w/e", "whatever")
-	text = text.replace("lol", "lawl")
-	text = text.replace("yume", "you may")
-	if (text == "gl") {
-		text = "good luck"
-	} else if (text == "ty") {
-		text = "thank you"
-	}
-	
-	
-	console.log(author + ": " + text)
-	let utterThis = new SpeechSynthesisUtterance(text);
-
-	const profile = profiles[author];
-	if (profile) {
-		// Use highest priority preferred voice that is available.
-		utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
-		utterThis.volume = profile.volume;
-		utterThis.pitch = profile.pitch;
-		utterThis.rate = profile.rate;
-	}
-	else {
-		// Use author name as a voice seed.
-		var seeded_random = (author + 'voice').hashCode()
-		var seeded_voice = Math.floor(seeded_random * 2) // assuming first two voices are the male microsoft ones, sorry for sloppy code :P
-		utterThis.voice = all_voices[seeded_voice];
-		utterThis.pitch = 1.0 + (((author + 'pitch').hashCode() - 0.5) * 1.4)
-		utterThis.rate = 1.0 + (((author + 'rate').hashCode() - 0.5) * 0.7)
-		utterThis.volume = 0.525
-	}
-	synth.speak(utterThis);
+    });
+    return log;
 }
 
-
-/*
-function nodeCheck(n) {
-	if (n.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
-		
-	}
+function printLog(log) {
+    log.forEach(m => console.log(m[0] + ': ' + m[1]));
 }
-*/
+
+// Equality of [author, text] pairs.
+function eq(m1, m2) {
+    return m1[0] == m2[0] && m1[1] == m2[1];
+}
 
 // Wait a couple seconds to let the page load before setting everything up.
 setTimeout(() => {    
     // Select the node that will be observed for mutations.
     const chatNode = document.getElementById('item-offset');
     if (!chatNode) {
-		console.error('chatNode null or something: ' + chatNode);
+	console.error('chatNode null or something: ' + chatNode);
     }
     
-	const config = { attributes: true, childList: false, subtree: false }
-	
-	// Start observing the chat.
+    // Options for the observer (which mutations to observe).
+    const config = { attributes: true, childList: true, subtree: true };
+    
+    // Capture initial state of the chat log.
+    let log = mkLog(chatNode.querySelector("#items").childNodes);
+
+    // Start observing the chat.
     new MutationObserver(() => {
-		const list = chatNode.querySelector("#items").childNodes;
-		let current_index = list.length - 1 // I belive this method still can skip messages, would like to resolve.
-		let newNode = list.item(current_index)
-		if (newNode.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
-			const author = newNode.querySelector("#content").childNodes[1].querySelector("#author-name").innerText;
-			const text = newNode.querySelector("#content").querySelector("#message").innerText;
-			speak(author, text);
-		}
-	}).observe(chatNode, config);
+	log = diff(log, mkLog(chatNode.querySelector("#items").childNodes));
+	console.log(log.length);
+    }).observe(chatNode, config);
+
+    // Compare old and new message logs to speak new messages.
+    function diff(old_log, new_log) {
+	// Iterate through new_log.
+	for (let i = 0; i < new_log.length; i++) {
+	    // If off the end of old_log, speak message and keep going.
+    	    if (i >= old_log.length) {
+    		speak(new_log[i][0], new_log[i][1]);
+    	    }
+	    // Else if messages don't match, shift old_log and revert
+	    // i. This happens when some old messages have been pushed
+	    // off the chat due to reaching the size limit. This step
+	    // aligns the logs so when we reach the end of old_log we
+	    // know that the remaining messages should be spoken.
+    	    else if (!eq(old_log[i], new_log[i])) {
+    		old_log.shift();
+    		i--;
+    	    }
+	}
+	return new_log;
+    }
+
+    // Speak a message (called from observer code).
+    function speak(author, text) {
+	if (blocklist.includes(author)) {
+	    return;
+	}
+	
+	let utterThis = new SpeechSynthesisUtterance(text);
+
+	const profile = profiles[author];
+	if (profile) {
+	    // Use highest priority preferred voice that is available.
+	    utterThis.voice = profile.voices.map(voice => all_voices.find(v => v.name === voice)).find(x => x);
+	    utterThis.volume = profile.volume;
+	}
+	else {
+	    // Leave voice as default.
+	    utterThis.volume = 0.5
+	}
+	
+	synth.speak(utterThis);
+    }
 }, 4000);
-
-
-
-
-
-
-
-
-
-
-
-
-
-

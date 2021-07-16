@@ -67,27 +67,22 @@ setTimeout(() => {
     // Select the node that will be observed for mutations.
     const chatNode = document.getElementById('item-offset');
     if (!chatNode) {
-	console.error('chatNode null or something: ' + chatNode);
+		console.error('chatNode null or something: ' + chatNode);
     }
     
-    // Options for the observer (which mutations to observe).
-    const config = { attributes: true, childList: true, subtree: true };
-    
-    // Initialize message counter (k) to point to the end of the chat.
-    let k = chatNode.querySelector("#items").childNodes.length;
-
-    // Start observing the chat.
+	const config = { attributes: true, childList: false, subtree: false }
+	
+	// Start observing the chat.
     new MutationObserver(() => {
-	const list = chatNode.querySelector("#items").childNodes;
-	for (; k < list.length; k++) {
-	    if (list[k].nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
-		const content = list[k].querySelector("#content");
-		const author = content.childNodes[1].querySelector("#author-name").innerText;
-		const text = content.querySelector("#message").innerText;
-		speak(author, text);
-	    }
-	}
-    }).observe(chatNode, config);
+		const list = chatNode.querySelector("#items").childNodes;
+		let newNode = list.item(list.length - 1)
+		if (newNode.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
+			const content = newNode.querySelector("#content");
+			const author = content.childNodes[1].querySelector("#author-name").innerText;
+			const text = content.querySelector("#message").innerText;
+			speak(author, text);
+		}
+	}).observe(chatNode, config);
 
     // Speak a message (called from observer code).
     function speak(author, text){
@@ -111,8 +106,6 @@ setTimeout(() => {
 		} else if (text == "ty") {
 			text = "thank you"
 		}
-		
-		console.log(text)
 		
 		if ((prior_author == author) && (prior_phrase == text)) {
 			return

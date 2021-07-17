@@ -80,23 +80,16 @@ function speak(author, text){
 	prior_phrase = text
 	
 	// splitting it by words can be good but I think I wanna separate by more than just spaces...
-	/*
-	var words = text.match(/\S+/g);
-	for (var i = 0; i < words.length; i++) { 
-		
-	}
-	text = words.join(' ');
-	*/
+	//console.log(text.split(/\W+/));
+	
+
+	// var words = text.match(/\W+/);
+	// console.log(words)
+	// for (var i = 0; i < words.length; i++) { 
+	// }
+	//text = words.join(' ');
 	
 	// text logic, cruddy right now.
-	text = text.replace("nair", "neutral air")
-	text = text.replace("bair", "back air")
-	text = text.replace("uair", "up air")
-	text = text.replace("dair", "down air")
-	text = text.replace("dtilt", "down tilt")
-	text = text.replace("OoS", "out of shield")
-	text = text.replace("ftilt", "forward tilt")
-	text = text.replace("utilt", "up tilt")
 	text = text.replace("w/e", "whatever")
 	text = text.replace("lol", "lawl")
 	text = text.replace("yume", "you may")
@@ -141,19 +134,20 @@ function nodeCheck(n) {
 
 // Wait a couple seconds to let the page load before setting everything up.
 setTimeout(() => {    
-    // Select the node that will be observed for mutations.
-    const chatNode = document.getElementById('item-offset');
-    if (!chatNode) {
+	// Select the node that will be observed for mutations.
+	const chatNode = document.getElementById('item-offset');
+	if (!chatNode) {
 		console.error('chatNode null or something: ' + chatNode);
-    }
+	}
     
-	const config = { attributes: true, childList: false, subtree: false }
+	const config = { attributes: true, childList: true, subtree: true }
 	
 	// Start observing the chat.
-    new MutationObserver(() => {
+	new MutationObserver(() => {
 		const list = chatNode.querySelector("#items").childNodes;
-		let current_index = list.length - 1 // I belive this method still can skip messages, would like to resolve.
+		let current_index = list.length - 1
 		let newNode = list.item(current_index)
+		//console.log(newNode)
 		if (newNode.nodeName == "YT-LIVE-CHAT-TEXT-MESSAGE-RENDERER") {
 			const author = newNode.querySelector("#content").childNodes[1].querySelector("#author-name").innerText;
 			const text = newNode.querySelector("#content").querySelector("#message").innerText;

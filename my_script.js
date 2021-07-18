@@ -57,7 +57,7 @@ if (typeof synth !== 'undefined' && synth.onvoiceschanged !== undefined) {
 
 console.log('YouTube Chat Web Speech API extension is running...');
 
-const blocked_phrases = ["cosmo", "ywnbaw", "you will never be a woman"]
+const blocked_phrases = ["http", "cosmo", "ywnbaw", "you will never be a woman"]
 var prior_author = ''
 var prior_phrase = ''
 
